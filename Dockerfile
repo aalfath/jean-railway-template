@@ -23,6 +23,21 @@ RUN apt-get update \
  && git config --system core.packedGitWindowSize 32m \
  && git config --system core.bigFileThreshold 16m
 
+# Agent CLIs, pinned. Installed in the image because Jean's in-app installer
+# loads the whole ~370 MB Claude Code binary into memory and is OOM-killed on a
+# 0.5 GB service. Jean picks these up automatically (CLI source "System PATH").
+ARG CLAUDE_CODE_VERSION=2.1.331
+ARG CODEX_VERSION=0.172.0
+ARG OPENCODE_VERSION=1.19.6
+RUN npm install -g --prefix /opt/agents --no-audit --no-fund --loglevel=error \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+      "@openai/codex@${CODEX_VERSION}" \
+      "opencode-ai@${OPENCODE_VERSION}" \
+ && npm cache clean --force \
+ && /opt/agents/bin/claude --version \
+ && /opt/agents/bin/codex --version \
+ && /opt/agents/bin/opencode --version
+
 COPY --from=jean /usr/local/bin/jean-server /usr/local/bin/jean-server
 COPY --from=jean /usr/bin/gh /usr/bin/gh
 COPY start.sh /usr/local/bin/jean-railway-start
@@ -30,7 +45,11 @@ RUN chmod 0755 /usr/local/bin/jean-railway-start /usr/local/bin/jean-server /usr
  && jean-server --version
 
 ENV HOME=/home/jean \
-    PATH=/home/jean/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PATH=/home/jean/.local/bin:/opt/agents/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    NPM_CONFIG_PREFIX=/home/jean/.local \
+    DISABLE_AUTOUPDATER=1 \
+    OPENCODE_DISABLE_AUTOUPDATE=1 \
+    OPENCODE_DISABLE_MODELS_FETCH=1 \
     PORT=3456
 
 EXPOSE 3456
